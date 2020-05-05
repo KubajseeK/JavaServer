@@ -16,6 +16,7 @@ import java.util.List;
 public class DateAndTime {
     List<User> userList = new ArrayList<>();
     List<String> logList = new ArrayList<>();
+    List<String> messagesList = new ArrayList<>();
 
     public DateAndTime() {
         userList.add(new User("Roman", "Simko", "roman", "heslo"));
@@ -126,28 +127,28 @@ public class DateAndTime {
     }
 
     @RequestMapping("/users/{login}")
-    public ResponseEntity<String> getOneUser(@RequestParam(value="token") String token, @PathVariable String login) {
+    public ResponseEntity<String> getOneUser(@RequestParam(value = "token") String token, @PathVariable String login) {
 
         JSONObject jsonObject = new JSONObject();
         User user = getUser(login);
 
-        if(token==null){
+        if (token == null) {
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\",\"Bad request\"}");
         }
 
-        if(findToken(token)){
+        if (findToken(token)) {
 
-            if(user==null){
+            if (user == null) {
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid User\"}");
             }
 
-            jsonObject.put("fname",user.getFname());
-            jsonObject.put("lname",user.getLname());
-            jsonObject.put("login",user.getLogin());
+            jsonObject.put("fname", user.getFname());
+            jsonObject.put("lname", user.getLname());
+            jsonObject.put("login", user.getLogin());
 
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(jsonObject.toString());
-        }
-        else return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid token\")");
+        } else
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid token\")");
     }
 
     @RequestMapping(method = RequestMethod.POST, value = "/signup")
@@ -189,12 +190,12 @@ public class DateAndTime {
         String login = jsonObject.getString("login");
         User user = getUser(login);
 
-        if(user!=null && findToken(token)){
+        if (user != null && findToken(token)) {
             user.setToken(null);
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{}");
         }
         JSONObject repsonse = new JSONObject();
-        repsonse.put("error","Incorrect login or token");
+        repsonse.put("error", "Incorrect login or token");
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(repsonse.toString());
     }
 
@@ -231,7 +232,7 @@ public class DateAndTime {
         return null;
     }
 
-    private boolean compareToken(String login, String token){
+    private boolean compareToken(String login, String token) {
         for (User user : userList) {
             if (user.getLogin().equals(login) && user.getToken().equals(token)) {
                 return true;
@@ -250,28 +251,28 @@ public class DateAndTime {
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "/log")
-    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token){
+    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token) {
         JSONObject response = new JSONObject();
         String login = "";
         JSONObject logObj = null;
 
         List<String> userLog = new ArrayList<>();
-        if (!findToken(token)){
+        if (!findToken(token)) {
             response.put("error", "invalid token");
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
 
 
-        for(User user : userList){
-            if(user.getToken().equals(token) && user.getToken()!=null){
+        for (User user : userList) {
+            if (user.getToken().equals(token) && user.getToken() != null) {
                 login = user.getLogin();
             }
         }
 
 
-        for (String log:logList) {
+        for (String log : logList) {
             logObj = new JSONObject(log);
-            if (logObj.getString("login").equals(login)){
+            if (logObj.getString("login").equals(login)) {
                 userLog.add(log);
             }
         }
@@ -295,16 +296,16 @@ public class DateAndTime {
     }
 
     @RequestMapping(method = RequestMethod.POST, value = "/changepassword")
-    public ResponseEntity<String> changePassword(@RequestBody String data, @RequestHeader(name = "Authorization") String token){
+    public ResponseEntity<String> changePassword(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
         JSONObject user = new JSONObject(data);
         JSONObject response = new JSONObject();
 
-        if (user.getString("login") != null && user.getString("oldpassword") != null && user.getString("newpassword") != null){
-            if (!compareToken(user.getString("login"), token)){
+        if (user.getString("login") != null && user.getString("oldpassword") != null && user.getString("newpassword") != null) {
+            if (!compareToken(user.getString("login"), token)) {
                 response.put("error", "Invalid Token");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
             }
-            if (compareLogin(user.getString("login"), user.getString("oldpassword"))){
+            if (compareLogin(user.getString("login"), user.getString("oldpassword"))) {
                 response.put("error", "Incorrect login or Password");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
             }
@@ -319,6 +320,59 @@ public class DateAndTime {
         }
         response.put("error", "Invalid body attributes");
         return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+    }
+
+    @RequestMapping(method = RequestMethod.POST, value = "/message/new")
+    public ResponseEntity<String> sendMessage(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
+        JSONObject jsonObject = new JSONObject(data);
+        JSONObject response = new JSONObject();
+        User user = getUser(jsonObject.getString("from"));
+
+        if (user == null || !findToken(token)) {
+            response.put("error", "No such login or token");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        }
+
+        if (jsonObject.has("from") && jsonObject.has("message") && jsonObject.has("to")) {
+            if (findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to"))) {
+                response.put("from", jsonObject.getString("from"));
+                response.put("message", jsonObject.getString("message"));
+                response.put("to", jsonObject.getString("to"));
+
+                messagesList.add(response.toString());
+                return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+            } else {
+                response.put("error", "No such entry in database");
+                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+            }
+        } else {
+            response.put("error", "Empty message or login");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        }
+    }
+
+    @RequestMapping(method = RequestMethod.GET, value = "/messages")
+    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
+        JSONObject jsonObject = new JSONObject(data);
+        JSONObject response = new JSONObject();
+        User user = getUser(jsonObject.getString("login"));
+
+        if (user == null || !findToken(token)) {
+            response.put("error", "No such login or token");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        }
+
+        if (jsonObject.has("login") && findLogin(jsonObject.getString("login"))) {
+            response.put("from", jsonObject.getString("login"));
+            for (int i = 0; i < messagesList.size(); i++) {
+                response.put("message: " + i, messagesList.get(i));
+            }
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+
+        } else {
+            response.put("error", "Wrong/Empty login.");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        }
     }
 
 }
