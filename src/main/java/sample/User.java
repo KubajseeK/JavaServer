@@ -42,4 +42,12 @@ public class User {
     public void setToken(String token) {
         this.token = token;
     }
+
+    public void setFname(String fname) {
+        this.fname = fname;
+    }
+
+    public void setLname(String lname) {
+        this.lname = lname;
+    }
 }

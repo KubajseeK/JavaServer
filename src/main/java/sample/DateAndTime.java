@@ -250,29 +250,26 @@ public class DateAndTime {
         return true;
     }
 
-    @RequestMapping(method = RequestMethod.GET, value = "/log")
-    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token) {
+    @RequestMapping(method = RequestMethod.GET, value = "/log?type={logType}")
+    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token, @PathVariable String logType) {
         JSONObject response = new JSONObject();
         String login = "";
         JSONObject logObj = null;
-
         List<String> userLog = new ArrayList<>();
+
+
         if (!findToken(token)) {
             response.put("error", "invalid token");
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
-
-
         for (User user : userList) {
             if (user.getToken().equals(token) && user.getToken() != null) {
                 login = user.getLogin();
             }
         }
-
-
         for (String log : logList) {
             logObj = new JSONObject(log);
-            if (logObj.getString("login").equals(login)) {
+            if (logObj.getString("login").equals(login) && logObj.getString("type").equals("logType")) {
                 userLog.add(log);
             }
         }
@@ -351,21 +348,25 @@ public class DateAndTime {
         }
     }
 
-    @RequestMapping(method = RequestMethod.GET, value = "/messages")
-    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
+    @RequestMapping(method = RequestMethod.GET, value = "/messages?from={fromLogin}")
+    public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token, @PathVariable String fromLogin) {
         JSONObject jsonObject = new JSONObject(data);
         JSONObject response = new JSONObject();
+
         User user = getUser(jsonObject.getString("login"));
 
         if (user == null || !findToken(token)) {
             response.put("error", "No such login or token");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
-
+        JSONObject message;
         if (jsonObject.has("login") && findLogin(jsonObject.getString("login"))) {
             response.put("from", jsonObject.getString("login"));
             for (int i = 0; i < messagesList.size(); i++) {
-                response.put("message: " + i, messagesList.get(i));
+                message = new JSONObject(messagesList.get(i));
+                if (message.getString("from").equals(fromLogin) && !fromLogin.equals("")) {
+                    response.put("message: " + i, messagesList.get(i));
+                }
             }
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
 
@@ -373,6 +374,52 @@ public class DateAndTime {
             response.put("error", "Wrong/Empty login.");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
+    }
+
+    @RequestMapping(method = RequestMethod.DELETE, value = "/delete/{login}")
+    public ResponseEntity<String> deleteUser(@RequestHeader(name = "Authorisation") String token, @PathVariable String login) {
+        JSONObject response = new JSONObject();
+        JSONObject jsonObject;
+
+        if (compareToken(login, token)) {
+            for (int i = 0; i < messagesList.size(); i++) {
+                jsonObject = new JSONObject(messagesList.get(i));
+                if (jsonObject.getString("from").equals(login)) {
+                    messagesList.remove(messagesList.get(i));
+                }
+            }
+            for (int i = 0; i < userList.size(); i++) {
+                if (userList.get(i).getLogin().equals(login)) {
+                    userList.remove(userList.get(i));
+                }
+            }
+            response.put("success", "User Removed.");
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        } else {
+            response.put("error", "Either login or token is wrong.");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        }
+    }
+
+    @RequestMapping(method = RequestMethod.PATCH, value = "/update/{login}")
+    public ResponseEntity<String> updateLogin(@RequestBody String data, @RequestHeader String token, @PathVariable String login) {
+        JSONObject jsonObject = new JSONObject(data);
+        JSONObject response = new JSONObject();
+
+        if (!compareToken(login, token)) {
+            response.put("error", "Either login or token is wrong.");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        }
+        if (jsonObject.has("fname") || jsonObject.has("lname") || (jsonObject.has("fname") && jsonObject.has("lname"))) {
+            for (User user : userList) {
+                if (user.getLogin().equals(login)) {
+                    user.setFname(jsonObject.getString("fname"));
+                    user.setLname(jsonObject.getString("lname"));
+                }
+            }
+        }
+        response.put("success", "Data changed");
+        return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
     }
 
 }
