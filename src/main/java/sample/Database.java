@@ -41,4 +41,6 @@ public class Database {
         logs.append("time", jsonObject.getString("timeStamp"));
         collectionLogs.insertOne(logs);
     }
+
+
 }
