@@ -154,16 +154,19 @@ public class DateAndTime {
     @RequestMapping(method = RequestMethod.POST, value = "/signup")
     public ResponseEntity<String> signup(@RequestBody String data) {
         JSONObject jsonObject = new JSONObject(data);
+        JSONObject databaseEntry = new JSONObject();
+        Database database = new Database();
+        JSONObject response = new JSONObject();
 
         if (jsonObject.has("fname") && jsonObject.has("lname") && jsonObject.has("login") && jsonObject.has("password")) {
             if (findLogin(jsonObject.getString("login"))) {
-                JSONObject response = new JSONObject();
+                response = new JSONObject();
                 response.put("error", "User already exists");
                 return ResponseEntity.status(400).body(response.toString());
             }
             String password = jsonObject.getString("password");
             if (password.isEmpty()) {
-                JSONObject response = new JSONObject();
+                response = new JSONObject();
                 response.put("error", "Password field can not be empty");
                 return ResponseEntity.status(400).body(response.toString());
             }
@@ -171,14 +174,20 @@ public class DateAndTime {
             User user = new User(jsonObject.getString("fname"), jsonObject.getString("lname"), jsonObject.getString("login"), hashPass);
             userList.add(user);
 
-            JSONObject response = new JSONObject();
+            databaseEntry.put("fname", jsonObject.getString("fname"));
+            databaseEntry.put("lname", jsonObject.getString("lname"));
+            databaseEntry.put("login", jsonObject.getString("login"));
+            databaseEntry.put("password", jsonObject.getString("password"));
+            database.insertUser(databaseEntry);
+
+
             response.put("fname", jsonObject.getString("fname"));
             response.put("lname", jsonObject.getString("lname"));
             response.put("login", jsonObject.getString("login"));
             return ResponseEntity.status(201).body(response.toString());
 
         } else {
-            JSONObject response = new JSONObject();
+            response = new JSONObject();
             response.put("error", "Invalid body request");
             return ResponseEntity.status(400).body(response.toString());
         }
@@ -418,6 +427,9 @@ public class DateAndTime {
     public ResponseEntity<String> updateLogin(@RequestBody String data, @RequestHeader String token, @PathVariable String login) {
         JSONObject jsonObject = new JSONObject(data);
         JSONObject response = new JSONObject();
+        String name = "";
+        String surname = "";
+        Database database = new Database();
 
         if (!compareToken(login, token)) {
             response.put("error", "Either login or token is wrong.");
@@ -426,9 +438,13 @@ public class DateAndTime {
         if (jsonObject.has("fname") || jsonObject.has("lname") || (jsonObject.has("fname") && jsonObject.has("lname"))) {
             for (User user : userList) {
                 if (user.getLogin().equals(login)) {
+                    name = user.getFname();
+                    surname = user.getLname();
                     user.setFname(jsonObject.getString("fname"));
                     user.setLname(jsonObject.getString("lname"));
                 }
+                database.updateFName(name, jsonObject.getString("fname"));
+                database.updateLName(surname, jsonObject.getString("lname"));
             }
         }
         response.put("success", "Data changed");

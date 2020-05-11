@@ -5,6 +5,7 @@ import com.mongodb.MongoClientURI;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.json.JSONObject;
 
 public class Database {
@@ -17,8 +18,11 @@ public class Database {
     MongoCollection<Document> collectionUsers = mongoDatabase.getCollection("collectionUsers");
     MongoCollection<Document> collectionMessages = mongoDatabase.getCollection("collectionMessages");
 
+    Document users = new Document();
+    Document messages = new Document();
+    Document logs = new Document();
+
     public void insertUser(JSONObject jsonObject) {
-        Document users = new Document();
         users.append("fname", jsonObject.getString("fname"));
         users.append("lname", jsonObject.getString("lname"));
         users.append("login", jsonObject.getString("login"));
@@ -27,7 +31,6 @@ public class Database {
     }
 
     public void insertMessage(JSONObject jsonObject) {
-        Document messages = new Document();
         messages.append("from", jsonObject.getString("from"));
         messages.append("message", jsonObject.getString("message"));
         messages.append("to", jsonObject.getString("to"));
@@ -35,11 +38,32 @@ public class Database {
     }
 
     public void log(JSONObject jsonObject) {
-        Document logs = new Document();
         logs.append("type", jsonObject.getString("logType"));
         logs.append("login", jsonObject.getString("login"));
         logs.append("time", jsonObject.getString("timeStamp"));
         collectionLogs.insertOne(logs);
+    }
+
+    public void updateFName(String name, String fname) {
+        Document search = new Document("fname", name);
+        Document found = (Document)collectionUsers.find(search).first();
+
+        if (found != null) {
+            Bson updatedValue = new Document("fname", fname);
+            Bson updateOperation = new Document("$set", updatedValue);
+            collectionUsers.updateOne(found, updateOperation);
+        }
+    }
+
+    public void updateLName(String surname, String lname) {
+        Document search = new Document("lname", surname);
+        Document found = (Document)collectionUsers.find(search).first();
+
+        if (found != null) {
+            Bson updatedValue = new Document("lname", lname);
+            Bson updateOperation = new Document("$set", updatedValue);
+            collectionUsers.updateOne(found, updateOperation);
+        }
     }
 
 
