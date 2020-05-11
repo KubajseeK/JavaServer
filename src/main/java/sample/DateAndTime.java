@@ -346,6 +346,8 @@ public class DateAndTime {
         JSONObject jsonObject = new JSONObject(data);
         JSONObject response = new JSONObject();
         User user = getUser(jsonObject.getString("from"));
+        JSONObject databaseEntry = new JSONObject();
+        Database database = new Database();
 
         if (user == null || !isTokenValid(token)) {
             response.put("error", "No such login or token");
@@ -357,8 +359,13 @@ public class DateAndTime {
                 response.put("from", jsonObject.getString("from"));
                 response.put("message", jsonObject.getString("message"));
                 response.put("to", jsonObject.getString("to"));
-
                 messages.add(response.toString());
+
+                databaseEntry.put("from", jsonObject.getString("from"));
+                databaseEntry.put("message", jsonObject.getString("message"));
+                databaseEntry.put("to", jsonObject.getString("to"));
+                database.insertMessage(databaseEntry);
+
                 return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
             } else {
                 response.put("error", "No such entry in database");
