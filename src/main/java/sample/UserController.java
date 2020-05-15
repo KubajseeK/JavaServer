@@ -12,15 +12,11 @@ import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
-@RestController
-public class DateAndTime {
+public class UserController {
+
     List<User> userList = new ArrayList<>();
     List<String> logList = new ArrayList<>();
     List<String> messages = new ArrayList<>();
-
-    public DateAndTime() {
-        userList.add(new User("Jakub", "Kutka", "kubik", "heslo"));
-    }
 
     @RequestMapping("/time")
     public ResponseEntity<String> getTime(@RequestParam(value = "token") String token) {
@@ -40,51 +36,6 @@ public class DateAndTime {
 
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid token\"}");
         }
-    }
-
-    @RequestMapping("/primenumber/{number}")
-    public ResponseEntity<String> checkPrimeNumber(@PathVariable int number) {
-        JSONObject jsonObj = new JSONObject();
-        boolean flag = false;
-        jsonObj.put("number", number);
-
-        for (int i = 2; i < number / 2; ++i) {
-            if (number % i == 0) {
-                flag = true;
-                break;
-            }
-        }
-        if (!flag) {
-            System.out.println(number + " is a prime number.");
-            jsonObj.put("primenumber", true);
-        } else {
-            System.out.println(number + " is not a prime number.");
-            jsonObj.put("primenumber", false);
-        }
-        return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(jsonObj.toString());
-    }
-
-    @RequestMapping("/time/hour")
-    public ResponseEntity<String> getHour() {
-        SimpleDateFormat sdfDate = new SimpleDateFormat("HH");
-        Date now = new Date();
-        String strHour = sdfDate.format(now);
-        return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{\"hour\":"+strHour+"}");
-    }
-
-    @RequestMapping("/hello")
-    public String getHello() {
-        return "Hello. How are you? ";
-    }
-
-    @RequestMapping("/hello/{name}")
-    public String getHelloWithName(@PathVariable String name) {
-        return "Hello " + name + ". How are you? ";
-    }
-
-    @RequestMapping("/hi")
-    public String getHi(@RequestParam(value = "fname") String fname, @RequestParam(value = "age") String age) {
-        return "Hello. How are you? Your name is " + fname + " and you are " + age;
     }
 
     @RequestMapping(method = RequestMethod.POST, value = "/login")
@@ -306,17 +257,19 @@ public class DateAndTime {
     private void log(User user, String logType) {
         JSONObject log = new JSONObject();
         String timeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
+        Database db = new Database();
 
         log.put("type", logType);
         log.put("login", user.getLogin());
         log.put("time", timeStamp);
-        logList.add(log.toString());
+        db.log(log);
     }
 
     @RequestMapping(method = RequestMethod.POST, value = "/changepassword")
     public ResponseEntity<String> changePassword(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
         JSONObject user = new JSONObject(data);
         JSONObject response = new JSONObject();
+        Database db = new Database();
 
         if (user.getString("login") != null && user.getString("oldpassword") != null && user.getString("newpassword") != null) {
             if (!compareToken(user.getString("login"), token)) {
@@ -329,13 +282,9 @@ public class DateAndTime {
             }
 
             String hashPass = hash(user.getString("newpassword"));
-            for (User users : userList) {
-                if (users.getLogin().equals(user.getString("login"))) {
-                    users.setPassword(hashPass);
-                    response.put(users.getLogin(), "password changed");
-                    return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(response.toString());
-                }
-            }
+            db.changePassword(user.getString("login"), hashPass);
+            response.put(user.getString("login"), "Password Successfully Changed!");
+            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
         response.put("error", "Invalid body attributes");
         return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
@@ -457,5 +406,4 @@ public class DateAndTime {
         response.put("success", "Data changed");
         return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
     }
-
 }

@@ -66,5 +66,16 @@ public class Database {
         }
     }
 
+    public void changePassword(String login, String hashPass) {
+        Document search = new Document("login", login);
+        Document found = collectionUsers.find(search).first();
+
+        if (found != null) {
+            Bson updatedValue = new Document("password", hashPass);
+            Bson updateOperation = new Document("$set", updatedValue);
+            collectionUsers.updateOne(found, updateOperation);
+        }
+    }
+
 
 }
