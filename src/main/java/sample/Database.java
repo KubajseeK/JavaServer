@@ -1,8 +1,10 @@
 package sample;
 
+import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -46,7 +48,7 @@ public class Database {
 
     public void updateFName(String name, String fname) {
         Document search = new Document("fname", name);
-        Document found = (Document)collectionUsers.find(search).first();
+        Document found = (Document) collectionUsers.find(search).first();
 
         if (found != null) {
             Bson updatedValue = new Document("fname", fname);
@@ -57,7 +59,7 @@ public class Database {
 
     public void updateLName(String surname, String lname) {
         Document search = new Document("lname", surname);
-        Document found = (Document)collectionUsers.find(search).first();
+        Document found = (Document) collectionUsers.find(search).first();
 
         if (found != null) {
             Bson updatedValue = new Document("lname", lname);
@@ -77,5 +79,49 @@ public class Database {
         }
     }
 
+    public void deleteUser(String login){
+        BasicDBObject query = new BasicDBObject();
+        query.put("login", login);
+        collectionUsers.deleteOne(query);
 
+        try (MongoCursor<Document> cursor = collectionMessages.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("from").equals(login)){
+                    query = new BasicDBObject();
+                    query.put("from", login);
+                    collectionMessages.deleteOne(query);
+                }
+            }
+        }
+    }
+
+    public void login(String login, String token) {
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (login.equals(object.getString("login"))){
+                    Document filterDoc = new Document().append("login", login);
+                    Document updateDoc = new Document().append("$set", new Document().append("token", token));
+                    collectionUsers.updateOne(filterDoc, updateDoc);
+                }
+            }
+        }
+    }
+
+    public void logout(String login, String token) {
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (login.equals(object.getString("login"))){
+                    Document filterDoc = new Document().append("login", login);
+                    Document updateDoc = new Document().append("$unset", new Document().append("token", token));
+                    collectionUsers.updateOne(filterDoc, updateDoc);
+                }
+            }
+        }
+    }
 }

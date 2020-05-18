@@ -41,6 +41,7 @@ public class UserController {
     @RequestMapping(method = RequestMethod.POST, value = "/login")
     public ResponseEntity<String> login(@RequestBody String credential) {
         JSONObject jsonObject = new JSONObject(credential);
+        Database database = new Database();
 
         if (jsonObject.has("login") && jsonObject.has("password")) {
             JSONObject response = new JSONObject();
@@ -60,6 +61,7 @@ public class UserController {
                 response.put("lname", templateUser.getLname());
                 response.put("login", templateUser.getLogin());
                 String token = generateToken();
+                database.login(templateUser.getLogin(), token);
                 response.put("token", token);
                 templateUser.setToken(token);
                 log(templateUser, "login");
@@ -150,9 +152,11 @@ public class UserController {
         JSONObject jsonObject = new JSONObject(data);
         String login = jsonObject.getString("login");
         User user = getUser(login);
+        Database database = new Database();
 
         if (user != null && isTokenValid(token)) {
             log(user, "logout");
+            database.logout(user.getLogin(), token);
             user.setToken(null);
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("Logged out successfully.");
         }
@@ -358,6 +362,7 @@ public class UserController {
     public ResponseEntity<String> deleteUser(@RequestHeader(name = "Authorization") String token, @PathVariable String login) {
         JSONObject response = new JSONObject();
         JSONObject jsonObject;
+        Database database = new Database();
 
         if (compareToken(login, token)) {
             for (int i = 0; i < messages.size(); i++) {
@@ -371,6 +376,7 @@ public class UserController {
                     userList.remove(userList.get(i));
                 }
             }
+            database.deleteUser(login);
             response.put("success", "User Removed.");
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         } else {
