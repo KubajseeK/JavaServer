@@ -9,17 +9,19 @@ import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
+import org.json.simple.parser.JSONParser;
 
-import java.util.Properties;
+import java.io.FileReader;
+
 
 public class Database {
 
-    Properties props = new Properties();
-    private final String uri = "mongodb+srv://Admin:admin@samplecluster-6cqhx.mongodb.net/test";
+    private final JSONObject config = getConfig();
+    private final String uri = config.getString("uri");
     MongoClientURI clientURI = new MongoClientURI(uri);
     MongoClient mongoClient = new MongoClient(clientURI);
 
-    MongoDatabase mongoDatabase = mongoClient.getDatabase("SchoolProject");
+    MongoDatabase mongoDatabase = mongoClient.getDatabase(config.getString("databaseName"));
     MongoCollection<Document> collectionLogs = mongoDatabase.getCollection("collectionLogs");
     MongoCollection<Document> collectionUsers = mongoDatabase.getCollection("collectionUsers");
     MongoCollection<Document> collectionMessages = mongoDatabase.getCollection("collectionMessages");
@@ -28,6 +30,22 @@ public class Database {
     Document messages = new Document();
     Document logs = new Document();
 
+
+    public JSONObject getConfig() {
+        JSONObject config = new JSONObject();
+        JSONParser parser = new JSONParser();
+
+        try {
+            org.json.simple.JSONObject obj = (org.json.simple.JSONObject) parser.parse(new FileReader("src/main/java/sample/config"));
+
+            config.put("uri", obj.get("uri"));
+            config.put("port", obj.get("port"));
+            config.put("databaseName", obj.get("databaseName"));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return config;
+    }
 
     public void insertUser(JSONObject jsonObject) {
         users.append("fname", jsonObject.getString("fname"));
@@ -53,7 +71,7 @@ public class Database {
 
     public void updateFName(String name, String fname) {
         Document search = new Document("fname", name);
-        Document found = (Document) collectionUsers.find(search).first();
+        Document found =  collectionUsers.find(search).first();
 
         if (found != null) {
             Bson updatedValue = new Document("fname", fname);
@@ -64,7 +82,7 @@ public class Database {
 
     public void updateLName(String surname, String lname) {
         Document search = new Document("lname", surname);
-        Document found = (Document) collectionUsers.find(search).first();
+        Document found =  collectionUsers.find(search).first();
 
         if (found != null) {
             Bson updatedValue = new Document("lname", lname);

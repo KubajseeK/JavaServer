@@ -1,0 +1,5 @@
+{
+  "uri": "mongodb+srv://Admin:admin@samplecluster-6cqhx.mongodb.net/test",
+  "port": "",
+  "databaseName": "SchoolProject"
+}
