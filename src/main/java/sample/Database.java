@@ -10,8 +10,12 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
 
+import java.util.Properties;
+
 public class Database {
-    String uri = "mongodb+srv://Admin:admin@samplecluster-6cqhx.mongodb.net/test";
+
+    Properties props = new Properties();
+    private final String uri = "mongodb+srv://Admin:admin@samplecluster-6cqhx.mongodb.net/test";
     MongoClientURI clientURI = new MongoClientURI(uri);
     MongoClient mongoClient = new MongoClient(clientURI);
 
@@ -23,6 +27,7 @@ public class Database {
     Document users = new Document();
     Document messages = new Document();
     Document logs = new Document();
+
 
     public void insertUser(JSONObject jsonObject) {
         users.append("fname", jsonObject.getString("fname"));
@@ -40,9 +45,9 @@ public class Database {
     }
 
     public void log(JSONObject jsonObject) {
-        logs.append("type", jsonObject.getString("logType"));
+        logs.append("type", jsonObject.getString("type"));
         logs.append("login", jsonObject.getString("login"));
-        logs.append("time", jsonObject.getString("timeStamp"));
+        logs.append("time", jsonObject.getString("time"));
         collectionLogs.insertOne(logs);
     }
 
@@ -123,5 +128,31 @@ public class Database {
                 }
             }
         }
+    }
+
+    public boolean findLogin(String login) {
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("login").equals(login)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public JSONObject getUser(String login) {
+        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                JSONObject object = new JSONObject(doc.toJson());
+                if (object.getString("login").equals(login)){
+                    return object;
+                }
+            }
+        }
+        return null;
     }
 }

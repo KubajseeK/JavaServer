@@ -6,17 +6,22 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
+@RestController
 public class UserController {
 
     List<User> userList = new ArrayList<>();
     List<String> logList = new ArrayList<>();
     List<String> messages = new ArrayList<>();
+    public UserController() {
+
+    }
 
     @RequestMapping("/time")
     public ResponseEntity<String> getTime(@RequestParam(value = "token") String token) {
@@ -56,14 +61,15 @@ public class UserController {
                 if (templateUser == null) {
                     return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{}");
                 }
+                String token = generateToken();
+                database.login(templateUser.getLogin(), token);
 
                 response.put("fname", templateUser.getFname());
                 response.put("lname", templateUser.getLname());
                 response.put("login", templateUser.getLogin());
-                String token = generateToken();
-                database.login(templateUser.getLogin(), token);
                 response.put("token", token);
                 templateUser.setToken(token);
+
                 log(templateUser, "login");
                 return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(response.toString());
 
@@ -130,7 +136,7 @@ public class UserController {
             databaseEntry.put("fname", jsonObject.getString("fname"));
             databaseEntry.put("lname", jsonObject.getString("lname"));
             databaseEntry.put("login", jsonObject.getString("login"));
-            databaseEntry.put("password", jsonObject.getString("password"));
+            databaseEntry.put("password", hashPass);
             database.insertUser(databaseEntry);
 
 
@@ -166,11 +172,8 @@ public class UserController {
     }
 
     private boolean findLogin(String login) {
-        for (User user : userList) {
-            if (user.getLogin().equalsIgnoreCase(login))
-                return true;
-        }
-        return false;
+        Database db = new Database();
+        return (db.findLogin(login));
     }
 
     private boolean checkPassword(String login, String password) {
@@ -220,8 +223,8 @@ public class UserController {
     }
 
     public boolean isTokenValid(String token) {
-        for(User useri : userList)
-            if(useri.getToken()!=null && useri.getToken().equals(token))
+        for(User user : userList)
+            if(user.getToken()!=null && user.getToken().equals(token))
                 return true;
 
         return false;
