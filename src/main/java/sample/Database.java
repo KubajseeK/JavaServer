@@ -6,12 +6,15 @@ import com.mongodb.MongoClientURI;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.mindrot.jbcrypt.BCrypt;
 
 import java.io.FileReader;
+import java.util.Random;
 
 
 public class Database {
@@ -47,11 +50,12 @@ public class Database {
         return config;
     }
 
-    public void insertUser(JSONObject jsonObject) {
-        users.append("fname", jsonObject.getString("fname"));
-        users.append("lname", jsonObject.getString("lname"));
-        users.append("login", jsonObject.getString("login"));
-        users.append("password", jsonObject.getString("password"));
+    public void insertUser(User user) {
+        users.append("fname", user.getFname());
+        users.append("lname", user.getLname());
+        users.append("login", user.getLogin());
+        users.append("password", user.getPassword());
+        users.append("token", user.getToken());
         collectionUsers.insertOne(users);
     }
 
@@ -120,57 +124,127 @@ public class Database {
         }
     }
 
-    public void login(String login, String token) {
-        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
-            while (cursor.hasNext()) {
-                Document doc = cursor.next();
-                JSONObject object = new JSONObject(doc.toJson());
-                if (login.equals(object.getString("login"))){
-                    Document filterDoc = new Document().append("login", login);
-                    Document updateDoc = new Document().append("$set", new Document().append("token", token));
-                    collectionUsers.updateOne(filterDoc, updateDoc);
-                }
-            }
-        }
-    }
+    public boolean loginUser(String login, String password) {
 
-    public void logout(String login, String token) {
-        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
-            while (cursor.hasNext()) {
-                Document doc = cursor.next();
-                JSONObject object = new JSONObject(doc.toJson());
-                if (login.equals(object.getString("login"))){
-                    Document filterDoc = new Document().append("login", login);
-                    Document updateDoc = new Document().append("$unset", new Document().append("token", token));
-                    collectionUsers.updateOne(filterDoc, updateDoc);
-                }
-            }
-        }
-    }
 
-    public boolean findLogin(String login) {
-        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
-            while (cursor.hasNext()) {
-                Document doc = cursor.next();
-                JSONObject object = new JSONObject(doc.toJson());
-                if (object.getString("login").equals(login)){
-                    return true;
-                }
-            }
+        BasicDBObject loginQuery = new BasicDBObject();
+        loginQuery.put("login", login);
+
+        Bson filter = Filters.eq("login", login);
+        Document myDoc = collectionUsers.find(filter).first();
+
+        assert myDoc != null;
+        String hashed = myDoc.getString("password");
+        User temp = getUser(login);
+
+        if (!findLogin(login) && BCrypt.checkpw(password, hashed) && temp.getLogin().equals(login)) {
+            BasicDBObject token = new BasicDBObject().append("token", generateToken());
+            temp.setToken(token.getString("token"));
+            collectionUsers.updateOne(loginQuery, new BasicDBObject("$set", token));
+            return true;
         }
         return false;
     }
 
-    public JSONObject getUser(String login) {
-        try (MongoCursor<Document> cursor = collectionUsers.find().iterator()) {
-            while (cursor.hasNext()) {
-                Document doc = cursor.next();
-                JSONObject object = new JSONObject(doc.toJson());
-                if (object.getString("login").equals(login)){
-                    return object;
-                }
+    public boolean logout(String login, String token) {
+        BasicDBObject loginQuery = new BasicDBObject();
+        loginQuery.put("login", login);
+        loginQuery.put("token", token);
+
+        User tempUser = getUser(login);
+        if (!findLogin(login) && checkToken(token) && tempUser.getLogin().equals(login)) {
+            collectionUsers.updateOne(loginQuery, new BasicDBObject("$unset", new BasicDBObject("token", token)));
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public boolean findLogin(String login) {
+        BasicDBObject loginQuery = new BasicDBObject();
+        loginQuery.put("login", login);
+        long count = collectionUsers.countDocuments(loginQuery);
+
+        if (count == 0) {
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public User getUser(String login) {
+        Bson bsonFilter = Filters.eq("login", login);
+        Document myDoc = collectionUsers.find(bsonFilter).first();
+
+
+        if (!findLogin(login)) {
+            assert myDoc != null;
+
+            return new User(myDoc.getString("fname"), myDoc.getString("lname"),
+                    myDoc.getString("login"), myDoc.getString("password"));
+
+        }
+
+        return null;
+    }
+
+    private String generateToken() {
+        int size=25;
+        Random rnd = new Random();
+        String generatedString="";
+        for(int i = 0;i<size;i++) {
+            int type=rnd.nextInt(4);
+
+            switch (type) {
+                case 0:
+                    generatedString += (char) ((rnd.nextInt(26)) + 65);
+                    break;
+                case 1:
+                    generatedString += (char) ((rnd.nextInt(10)) + 48);
+                    break;
+                default:
+                    generatedString += (char) ((rnd.nextInt(26)) + 97);
             }
         }
+        return generatedString;
+    }
+
+    public String getToken(String login) {
+        Bson bsonFilter = Filters.eq("login", login);
+        Document myDoc = collectionUsers.find(bsonFilter).first();
+
+        if (!findLogin(login)) {
+            assert myDoc != null;
+            return myDoc.getString("token");
+        }
         return null;
+    }
+
+    public boolean checkPassword(String login, String password) {
+        BasicDBObject loginQuery = new BasicDBObject();
+        loginQuery.put("login", login);
+        loginQuery.put("password", password);
+        User temp = getUser(login);
+
+
+        if (!findLogin(login)) {
+
+            return BCrypt.checkpw(password, temp.getPassword());
+        }
+
+        return false;
+    }
+
+    public boolean checkToken(String token) {
+        BasicDBObject loginQuery = new BasicDBObject();
+        loginQuery.append("token", token);
+
+        long count = collectionUsers.countDocuments(loginQuery);
+        if (count > 0) {
+            return true;
+        }
+        return false;
     }
 }
