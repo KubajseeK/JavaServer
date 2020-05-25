@@ -262,53 +262,40 @@ public class UserController {
 
     @RequestMapping(method = RequestMethod.POST, value = "/changepassword")
     public ResponseEntity<String> changePassword(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
-        JSONObject user = new JSONObject(data);
+        JSONObject jsonObject = new JSONObject(data);
         JSONObject response = new JSONObject();
         Database db = new Database();
+        User user = db.getUser(jsonObject.getString("login"));
 
-        if (user.getString("login") != null && user.getString("oldpassword") != null && user.getString("newpassword") != null) {
-            if (!compareToken(user.getString("login"), token)) {
-                response.put("error", "Invalid Token");
-                return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
-            }
-            if (!findLogin(user.getString("login")) || !checkPassword(user.getString("login"), user.getString("oldpassword"))) {
-                response.put("error", "Incorrect login or Password");
-                return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
-            }
 
-            String hashPass = hash(user.getString("newpassword"));
-            db.changePassword(user.getString("login"), hashPass);
-            response.put(user.getString("login"), "Password Successfully Changed!");
-            return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        if (!db.findLogin(jsonObject.getString("login")) && db.checkPassword(jsonObject.getString("login"), jsonObject.getString("oldpassword"))) {
+            if (db.checkToken(token) && token.equals(db.getToken(jsonObject.getString("login")))) {
+                db.changePassword(user.getPassword(), jsonObject.getString("newpassword"), jsonObject.getString("login"), token);
+                return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{\"message\": \"Password for user \"" + jsonObject.getString("login") + "\" is succesfully changed\"}");
+            }
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\" error\": \"Invalid token\"}");
         }
-        response.put("error", "Invalid body attributes");
-        return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\":\"Invalid login or password\"}");
     }
 
     @RequestMapping(method = RequestMethod.POST, value = "/message/new")
     public ResponseEntity<String> sendMessage(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
         JSONObject jsonObject = new JSONObject(data);
         JSONObject response = new JSONObject();
-        User user = getUser(jsonObject.getString("from"));
-        JSONObject databaseEntry = new JSONObject();
-        Database database = new Database();
+        String timeStamp = new SimpleDateFormat("HH:mm:ss dd/MM/yyyy").format(new Date());
 
-        if (user == null || !isTokenValid(token)) {
-            response.put("error", "No such login or token");
-            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
-        }
+        Database database = new Database();
+        User user = database.getUser(jsonObject.getString("from"));
 
         if (jsonObject.has("from") && jsonObject.has("message") && jsonObject.has("to")) {
-            if (findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to"))) {
+            if (database.getToken(user.getLogin()).equals(token) && !database.findLogin(jsonObject.getString("from")) && !database.findLogin(jsonObject.getString("to"))) {
                 response.put("from", jsonObject.getString("from"));
                 response.put("message", jsonObject.getString("message"));
                 response.put("to", jsonObject.getString("to"));
-                messages.add(response.toString());
 
-                databaseEntry.put("from", jsonObject.getString("from"));
-                databaseEntry.put("message", jsonObject.getString("message"));
-                databaseEntry.put("to", jsonObject.getString("to"));
-                database.insertMessage(databaseEntry);
+                jsonObject.put("time", timeStamp);
+                database.insertMessage(jsonObject.getString("from"), jsonObject.getString("to"), jsonObject.getString("message"));
+
 
                 return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
             } else {
@@ -380,27 +367,18 @@ public class UserController {
     public ResponseEntity<String> updateLogin(@RequestBody String data, @RequestHeader String token, @PathVariable String login) {
         JSONObject jsonObject = new JSONObject(data);
         JSONObject response = new JSONObject();
-        String name = "";
-        String surname = "";
+        String name = jsonObject.getString("fname");
+        String surname = jsonObject.getString("lname");
         Database database = new Database();
+        User user = database.getUser(login);
 
-        if (!compareToken(login, token)) {
-            response.put("error", "Either login or token is wrong.");
-            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+
+        if (!database.findLogin(login) && database.getToken(user.getLogin()).equals(token)) {
+
+            database.updateUser(name, surname, login, token);
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body("Credentials for user " + jsonObject.getString("fname") + " was successfuly changed");
+        } else {
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\": \"Invalid token or login\"}");
         }
-        if (jsonObject.has("fname") || jsonObject.has("lname") || (jsonObject.has("fname") && jsonObject.has("lname"))) {
-            for (User user : userList) {
-                if (user.getLogin().equals(login)) {
-                    name = user.getFname();
-                    surname = user.getLname();
-                    user.setFname(jsonObject.getString("fname"));
-                    user.setLname(jsonObject.getString("lname"));
-                }
-                database.updateFName(name, jsonObject.getString("fname"));
-                database.updateLName(surname, jsonObject.getString("lname"));
-            }
-        }
-        response.put("success", "Data changed");
-        return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
     }
 }

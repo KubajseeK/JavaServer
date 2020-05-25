@@ -3,6 +3,7 @@ package sample;
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
@@ -14,6 +15,10 @@ import org.json.simple.parser.JSONParser;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.io.FileReader;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 
@@ -59,10 +64,11 @@ public class Database {
         collectionUsers.insertOne(users);
     }
 
-    public void insertMessage(JSONObject jsonObject) {
-        messages.append("from", jsonObject.getString("from"));
-        messages.append("message", jsonObject.getString("message"));
-        messages.append("to", jsonObject.getString("to"));
+    public void insertMessage(String from, String to, String message) {
+        messages.append("from", from);
+        messages.append("message", to);
+        messages.append("to", message);
+        messages.append("time", getTime());
         collectionMessages.insertOne(messages);
     }
 
@@ -73,37 +79,30 @@ public class Database {
         collectionLogs.insertOne(logs);
     }
 
-    public void updateFName(String name, String fname) {
-        Document search = new Document("fname", name);
-        Document found =  collectionUsers.find(search).first();
+    public void updateUser(String fname, String lname, String login, String token) {
+        User temp=getUser(login);
+        BasicDBObject updateQuery=new BasicDBObject();
+        updateQuery.put("fname",temp.getFname());
+        updateQuery.put("lname",temp.getLname());
+        updateQuery.put("token",token);
 
-        if (found != null) {
-            Bson updatedValue = new Document("fname", fname);
-            Bson updateOperation = new Document("$set", updatedValue);
-            collectionUsers.updateOne(found, updateOperation);
-        }
+        collectionUsers.updateOne(updateQuery, new BasicDBObject("$set", new BasicDBObject("fname", fname).append("lname", lname)));
     }
 
-    public void updateLName(String surname, String lname) {
-        Document search = new Document("lname", surname);
-        Document found =  collectionUsers.find(search).first();
+    public boolean changePassword(String oldPassword, String newPassword, String login, String token) {
+        BasicDBObject loginQuery=new BasicDBObject();
+        loginQuery.append("login", login);
+        loginQuery.append("password",oldPassword);
+        loginQuery.append("token",token);
 
-        if (found != null) {
-            Bson updatedValue = new Document("lname", lname);
-            Bson updateOperation = new Document("$set", updatedValue);
-            collectionUsers.updateOne(found, updateOperation);
+        User tempUser=getUser(login);
+
+        if (checkToken(token) && !findLogin(login) && tempUser.getLogin().equals(login)){
+            collectionUsers.updateOne(loginQuery, new BasicDBObject("$set", new BasicDBObject("password", hashPass(newPassword))));
+            mongoClient.close();
+            return true;
         }
-    }
-
-    public void changePassword(String login, String hashPass) {
-        Document search = new Document("login", login);
-        Document found = collectionUsers.find(search).first();
-
-        if (found != null) {
-            Bson updatedValue = new Document("password", hashPass);
-            Bson updateOperation = new Document("$set", updatedValue);
-            collectionUsers.updateOne(found, updateOperation);
-        }
+        return false;
     }
 
     public void deleteUser(String login){
@@ -246,5 +245,44 @@ public class Database {
             return true;
         }
         return false;
+    }
+
+    public String getTime() {
+        DateTimeFormatter format = DateTimeFormatter.ofPattern("ddMMyy HH:mm:ss");
+        LocalDateTime time = LocalDateTime.now();
+        return format.format(time);
+
+    }
+
+    public List<String> getMessage(String login, String token) {
+        Bson filter=Filters.eq("from", login);
+        FindIterable<Document> message=collectionMessages.find(filter);
+
+        BasicDBObject query=new BasicDBObject();
+        query.append("login",login);
+        query.append("token", token);
+
+        FindIterable<Document> doc=collectionUsers.find(query);
+        List<String> temp=new ArrayList<>();
+        JSONObject obj=new JSONObject();
+
+        if (!findLogin(login) && checkToken(token)) {
+            if (doc.iterator().hasNext()) {
+                for (Document p : message) {
+                    obj.put("from", p.getString("from"));
+                    obj.put("to", p.getString("to"));
+                    obj.put("message", p.getString("message"));
+                    obj.put("time", p.getString("time"));
+                    temp.add(obj.toString());
+                }
+            }
+        }
+
+        return temp;
+    }
+
+    public String hashPass(String password) {
+        return BCrypt.hashpw(password, BCrypt.gensalt(12));
+
     }
 }
