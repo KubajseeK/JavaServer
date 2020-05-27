@@ -223,30 +223,15 @@ public class UserController {
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "/log")
-    public ResponseEntity<String> getLogList(@RequestHeader(name = "Authorization") String token, @RequestParam(value = "type") String logType) {
-        JSONObject jsonObject = new JSONObject();
-        List<String> userLogs = new ArrayList<>();
-        String login = "";
+    public ResponseEntity<String> getLogList(@RequestBody String data, @RequestHeader(name = "Authorization") String token, @RequestParam(value = "type") String logType) {
+       JSONObject jsonObject = new JSONObject(data);
 
-        if (!isTokenValid(token)) {
-            jsonObject.put("error", "invalid token");
-            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(jsonObject.toString());
-        }
-
-        for (User users : userList) {
-            if (users.getToken() != null) {
-                login = users.getLogin();
-            }
-        }
-
-        JSONObject logObj = null;
-        for (String log : logList) {
-            logObj = new JSONObject(log);
-            if (logObj.getString("login").equals(login) && logObj.getString("type").equals(logType)) {
-                userLogs.add(log);
-            }
-        }
-        return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(userLogs.toString());
+       if (!database.checkToken(token)) {
+           jsonObject.put("error", "invalid token");
+           return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(jsonObject.toString());
+       }
+       database.logList(jsonObject.getString("login"), token);
+       return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body("{\"message\": \"Hej funguje.\"}");
     }
 
     private void log(User user, String logType) {
@@ -338,35 +323,19 @@ public class UserController {
 
     @RequestMapping(method = RequestMethod.DELETE, value = "/delete/{login}")
     public ResponseEntity<String> deleteUser(@RequestHeader(name = "Authorization") String token, @PathVariable String login) {
-        JSONObject response = new JSONObject();
-        JSONObject jsonObject;
-        Database database = new Database();
+        User user = database.getUser(login);
 
-        if (compareToken(login, token)) {
-            for (int i = 0; i < messages.size(); i++) {
-                jsonObject = new JSONObject(messages.get(i));
-                if (jsonObject.getString("from").equals(login)) {
-                    messages.remove(messages.get(i));
-                }
-            }
-            for (int i = 0; i < userList.size(); i++) {
-                if (userList.get(i).getLogin().equals(login)) {
-                    userList.remove(userList.get(i));
-                }
-            }
-            database.deleteUser(login);
-            response.put("success", "User Removed.");
-            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+        if (!database.findLogin(login) && database.getToken(user.getLogin()).equals(token)) {
+            database.deleteUser(login, token);
+            return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body("{\"message\": \"User successfully removed!\"}");
         } else {
-            response.put("error", "Either login or token is wrong.");
-            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body("{\"error\": \"Invalid login or token\"}");
         }
     }
 
     @RequestMapping(method = RequestMethod.PATCH, value = "/update/{login}")
     public ResponseEntity<String> updateLogin(@RequestBody String data, @RequestHeader String token, @PathVariable String login) {
         JSONObject jsonObject = new JSONObject(data);
-        JSONObject response = new JSONObject();
         String name = jsonObject.getString("fname");
         String surname = jsonObject.getString("lname");
         Database database = new Database();

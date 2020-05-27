@@ -5,7 +5,6 @@ import com.mongodb.MongoClient;
 import com.mongodb.MongoClientURI;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import org.bson.Document;
@@ -80,10 +79,10 @@ public class Database {
     }
 
     public void updateUser(String fname, String lname, String login, String token) {
-        User temp=getUser(login);
+        User user=getUser(login);
         BasicDBObject updateQuery=new BasicDBObject();
-        updateQuery.put("fname",temp.getFname());
-        updateQuery.put("lname",temp.getLname());
+        updateQuery.put("fname",user.getFname());
+        updateQuery.put("lname",user.getLname());
         updateQuery.put("token",token);
 
         collectionUsers.updateOne(updateQuery, new BasicDBObject("$set", new BasicDBObject("fname", fname).append("lname", lname)));
@@ -105,22 +104,21 @@ public class Database {
         return false;
     }
 
-    public void deleteUser(String login){
-        BasicDBObject query = new BasicDBObject();
-        query.put("login", login);
-        collectionUsers.deleteOne(query);
+    public boolean deleteUser(String login, String token){
+        BasicDBObject deleteQuery=new BasicDBObject();
+        deleteQuery.put("login",login);
+        deleteQuery.put("token",token);
+        FindIterable<Document> find=collectionUsers.find(deleteQuery);
 
-        try (MongoCursor<Document> cursor = collectionMessages.find().iterator()) {
-            while (cursor.hasNext()) {
-                Document doc = cursor.next();
-                JSONObject object = new JSONObject(doc.toJson());
-                if (object.getString("from").equals(login)){
-                    query = new BasicDBObject();
-                    query.put("from", login);
-                    collectionMessages.deleteOne(query);
-                }
+        if (!findLogin(login) && checkToken(token)){
+            if (find.iterator().hasNext()){
+                collectionUsers.deleteOne(deleteQuery);
+                return true;
+            } else {
+                return false;
             }
         }
+        return false;
     }
 
     public boolean loginUser(String login, String password) {
@@ -284,5 +282,38 @@ public class Database {
     public String hashPass(String password) {
         return BCrypt.hashpw(password, BCrypt.gensalt(12));
 
+    }
+
+    public List<String> logList(String login, String token) {
+        BasicDBObject loginQuery = new BasicDBObject();
+        BasicDBObject checkQuery = new BasicDBObject();
+        JSONObject jsonObject = new JSONObject();
+        User user = getUser(login);
+        List<String> temp = new ArrayList<>();
+
+        loginQuery.append("type", login);
+
+        checkQuery.append("login", login);
+        checkQuery.append("token", token);
+
+        Bson bsonFilter = Filters.eq("login", login);
+        Document document = collectionLogs.find(bsonFilter).first();
+        FindIterable<Document> documentLogFinder = collectionLogs.find(bsonFilter);
+        FindIterable<Document> documentUserFinder = collectionUsers.find(checkQuery);
+
+        if (!findLogin(login) && checkToken(token) && user.getLogin().equals(login) && document != null) {
+            if (documentUserFinder.iterator().hasNext()) {
+                for (Document doc : documentLogFinder) {
+                    jsonObject.put("type", doc.getString("type"));
+                    jsonObject.put("login", doc.getString("login"));
+                    jsonObject.put("time", doc.getString("time"));
+                    temp.add(jsonObject.toString());
+                }
+            } else {
+                return null;
+            }
+            return temp;
+        }
+        return null;
     }
 }
