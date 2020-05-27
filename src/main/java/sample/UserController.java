@@ -19,6 +19,7 @@ public class UserController {
     List<String> logList = new ArrayList<>();
     List<String> messages = new ArrayList<>();
     Database database = new Database();
+    int totalLoginAttempts = 3;
 
     public UserController() {
 
@@ -56,26 +57,34 @@ public class UserController {
                 response.put("error", "Login and password are required");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
             }
+            if (totalLoginAttempts != 0) {
+                if (!database.findLogin(obj.getString("login")) && database.checkPassword(obj.getString("login"), obj.getString("password"))) {
 
-            if (!database.findLogin(obj.getString("login")) && database.checkPassword(obj.getString("login"), obj.getString("password"))) {
+                    database.loginUser(obj.getString("login"), obj.getString("password"));
+                    User loggedUser = database.getUser(obj.getString("login"));
+                    response.put("fname", loggedUser.getFname());
+                    response.put("lname", loggedUser.getLname());
+                    response.put("login", loggedUser.getLogin());
+                    response.put("token", database.getToken(loggedUser.getLogin()));
+                    log(loggedUser, "login");
 
-                database.loginUser(obj.getString("login"), obj.getString("password"));
-                User loggedUser = database.getUser(obj.getString("login"));
-                response.put("fname", loggedUser.getFname());
-                response.put("lname", loggedUser.getLname());
-                response.put("login", loggedUser.getLogin());
-                response.put("token", database.getToken(loggedUser.getLogin()));
-                log(loggedUser, "login");
+                    return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+                } else {
+                    response.put("error", "Invalid login or password");
+                    totalLoginAttempts--;
+                    System.out.println(totalLoginAttempts);
 
-                return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+                    return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+                }
             } else {
-                response.put("error", "Invalid login or password");
-                return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
+                JSONObject result = new JSONObject();
+                result.put("error", "Maximum number of login attempts exceeded! Try again later.");
+                return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(result.toString());
             }
         } else {
-            JSONObject result = new JSONObject();
-            result.put("error", "Missing login or password");
-            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(result.toString());
+            JSONObject response = new JSONObject();
+            response.put("error", "Either login or password are missing!");
+            return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
     }
 
