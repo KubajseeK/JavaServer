@@ -57,7 +57,7 @@ public class UserController {
 
         if (tempUser.getLogin()!=null && tempUser.getPassword()!=null){
             if (!matchLogin(tempUser.getLogin(), tempUser.getPassword())){
-                res.put("error", "wrong password or login");
+                res.put("error", "Login/Password is wrong.");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
             String token = generateToken();
@@ -110,13 +110,13 @@ public class UserController {
         if (tempUser.getFname()!=null && tempUser.getLname()!=null && tempUser.getLogin()!=null && tempUser.getPassword()!=null) {
             if (findLogin(tempUser.getLogin())) {
                 JSONObject response = new JSONObject();
-                response.put("error", "User already exists");
+                response.put("error", "User Already Exists");
                 return ResponseEntity.status(400).body(response.toString());
             }
 
             if (tempUser.getPassword().isEmpty()) {
                 JSONObject response = new JSONObject();
-                response.put("error", "Password field can not be empty");
+                response.put("error", "Password field is mandatory.");
                 return ResponseEntity.status(400).body(response.toString());
             }
             String hashPass = hash(jsonObject.getString("password"));
@@ -156,7 +156,7 @@ public class UserController {
         }
 
         JSONObject res = new JSONObject();
-        res.put("error","Incorrect login or token");
+        res.put("error","Login/Token is not valid.");
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
@@ -263,7 +263,7 @@ public class UserController {
         JSONObject res = new JSONObject();
         List<String> userLog;
         if (!findToken(token)){
-            res.put("error", "invalid token");
+            res.put("error", "Token not valid.");
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
 
@@ -282,18 +282,18 @@ public class UserController {
 
         if (user.getString("login") != null && user.getString("oldpassword") != null && user.getString("newpassword") != null){
             if (!matchToken(user.getString("login"), token)){
-                res.put("error", "no login with such token");
+                res.put("error", "Token doesn't match.");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
             if (!matchLogin(user.getString("login"), user.getString("oldpassword"))){
-                res.put("error", "wrong password or login");
+                res.put("error", "Login/Password is wrong.");
                 return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
             }
             String passHash = hash(user.getString("newpassword"));
 
             Database db = new Database();
             db.changePassword(user.getString("login"), passHash);
-            res.put(user.getString("login"), "password changed");
+            res.put(user.getString("login"), "Password Successfully Changed!");
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
         res.put("error", "missing body attributes");
@@ -313,7 +313,7 @@ public class UserController {
         String login = jsonObject.getString("from");
 
         if (login == null  || !findToken(token) ) {
-            res.put("error", "invalid token or login");
+            res.put("error", "Login/Token is invalid.");
             return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
         if (matchToken(jsonObject.getString("from"), token) && findLogin(jsonObject.getString("from")) && findLogin(jsonObject.getString("to")) && jsonObject.has("message")) {
@@ -332,7 +332,7 @@ public class UserController {
 
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         } else {
-            res.put("error", "wrong input data");
+            res.put("error", "Wrong Body Request.");
             return ResponseEntity.status(400).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
     }
@@ -345,7 +345,9 @@ public class UserController {
     @RequestMapping(method = RequestMethod.POST, value = "/messages")
     public ResponseEntity<String> getMessages(@RequestBody String data, @RequestHeader(name = "Authorization") String token) {
         org.json.JSONObject jsonObject = new org.json.JSONObject(data);
-        JSONObject res = new JSONObject();
+        JSONObject response = new JSONObject();
+        List<String> messages;
+        Database db = new Database();
 
         String login;
         String fromLogin = null;
@@ -354,19 +356,17 @@ public class UserController {
             if (findLogin(jsonObject.getString("login")) && findToken(token)) {
                 login = jsonObject.getString("login");
             }else {
-                res.put("error", "login or token not found");
-                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+                response.put("error", "Login/Token not found.");
+                return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
             }
             if (jsonObject.has("from")){
                 fromLogin = jsonObject.getString("from");
             }
         }else {
-            res.put("error", "invalid input data");
-            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            response.put("error", "Wrong Body Request.");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
 
-        List<String> messages;
-        Database db = new Database();
 
         if (fromLogin != null && matchToken(login, token)){
             messages = db.getMessages(login, fromLogin);
@@ -375,8 +375,8 @@ public class UserController {
             messages = db.getMessages(login);
             return ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON).body(messages.toString());
         }else {
-            res.put("error", "not authorised");
-            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
+            response.put("error", "not authorised");
+            return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(response.toString());
         }
     }
 
@@ -456,7 +456,7 @@ public class UserController {
             }
             return ResponseEntity.status(200).contentType(MediaType.APPLICATION_JSON).body(res.toString());
         }
-        res.put("error", "no users logged in");
+        res.put("error", "Nobody is Online.");
         return ResponseEntity.status(401).contentType(MediaType.APPLICATION_JSON).body(res.toString());
     }
 
